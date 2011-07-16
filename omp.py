@@ -2,6 +2,9 @@ from patch_util import *
 from pylab import *
 import logging 
 
+def omp_stopfun(max_iter, min_err):
+  return lambda n, err: n > max_iter or err < min_err
+
 def orthogonal_matching_pursuit(D, y, stop_fun, inner_product=None):
   """Greedy algorithm for finding a sparse representation of y on
   overcomplete and potentially redundant dictionary D.
@@ -41,7 +44,7 @@ def orthogonal_matching_pursuit(D, y, stop_fun, inner_product=None):
     else:
       return x
 
-  while not stop_fun(iter_num, norm(err) / norm(y) ):
+  while not stop_fun(iter_num, err / norm(y) ):
     # find max inner product
     iprods = None
     if inner_product is None:
@@ -93,9 +96,17 @@ def orthogonal_matching_pursuit(D, y, stop_fun, inner_product=None):
     residual -= (r*new_atom).reshape(residual.shape)
     iter_num += 1
 
+    # compute R^{-1} x, the dictionary coefficients
+    if iter_num > 2:
+      coeffs = lu_solve( (R, arange(R.shape[0]) ), x )
+      q = zeros( (K,1) )
+      q[(used_atoms)] = coeffs
+
+      err = norm(y - dot(D,q))
+
   # compute R^{-1} x, the dictionary coefficients
   coeffs = lu_solve( (R, arange(R.shape[0]) ), x )
-  x = zeros( (K,1) )
-  x[(used_atoms)] = coeffs
-  return x
+  q = zeros( (K,1) )
+  q[(used_atoms)] = coeffs
+  return q
 

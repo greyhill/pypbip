@@ -6,6 +6,10 @@ from patch_util import *
 from pylab import *
 from omp import *
 import logging 
+import random
+
+def ksvd_stopfun(max_iter, min_err):
+  return lambda n, err: n > max_iter or err < min_err
 
 def ksvd(Y, k, pursuit_fun, stop_fun):
   """Compute a dictionary capable of sparsely representing the given
@@ -33,8 +37,7 @@ def ksvd(Y, k, pursuit_fun, stop_fun):
 
 
   # initialize dictionary columns; normalize
-  D = rand(N, k)
-  D[:,0] = 1
+  D = rand(N,k)
   for j in range(k): D[:,j] = D[:,j] / norm(D[:,j])
 
   # initialize coefficients
@@ -43,53 +46,69 @@ def ksvd(Y, k, pursuit_fun, stop_fun):
 
   iter_num = 1
 
-  import ghpmath
-  ticker = ghpmath.ticker(2)
   err = inf
-  total_energy = 1
+  total_energy = norm(Y, 'fro')
 
   while not stop_fun(iter_num, err/total_energy):
     logger.info("beginning iteration %d" % iter_num)
     err = 0
-    total_energy = 0
 
     # use pursuit to find sparse columns of X
     for i in range(M): 
-      if ticker.due(): logger.info("matching pursuit on column %d" % i)
       x = pursuit_fun(D, Y[:,i])
       X[:,i] = x.squeeze()
 
-    # dictionary update
-    for i in range(k):
-      if i==0: continue
-      if ticker.due(): logger.info("dictionary update on column %d" % i)
+    err = norm(Y - dot(D,X), 'fro')
+    logger.info(('percent representation error for iteration %d was %f ' \
+        + 'before dictionary update') % (iter_num, err/total_energy))
 
+    # dictionary update; perform in random order
+    atom_indices = range(k)
+    random.shuffle(atom_indices)
+    for i in atom_indices:
       x_using = nonzero(X[i,:])[0]
-      if len(x_using) == 0: continue
+
+      if len(x_using) == 0: 
+        # unused column -> replace by the signal in the training data
+        # with the worst representation
+        Repr_err = Y - dot(D,X)
+        Repr_err_norms = [ norm(Repr_err[:,j]) for j in range(M) ]
+        worst_signal = argmax(Repr_err_norms)
+        D[:,i] = Y[:,worst_signal] / norm(Y[:,worst_signal])
+        continue
 
       # compute residual error
-      Residual_err = Y[:,x_using].copy()
-      for j in range(k):
-        if i==j: continue
-        a = D[:,j]
-        b = X[j,x_using].squeeze()
-        Residual_err -= outer(a,b)
+      # threw out the following two techniques for numerical
+      # stability/speed reasons
+      #Residual_err = Y[:,x_using].copy()
+      #for j in range(k):
+      #  if i==j: continue
+      #  a = D[:,j]
+      #  b = X[j,x_using]
+      #  Residual_err -= outer(a,b)
+      #Residual_err = Y - dot(D, X) + outer(D[:,i], X[i,:])
+      #Residual_err = Residual_err[:,x_using]
+
+      X[i,:] = 0
+      Residual_err = Y[:,x_using] - dot(D,X[:,x_using])
 
       # find optimal rank-1 approximation to residual error
       try:
         U, s, V = svd(Residual_err)
-        err += sum( s[1:]**2 ) 
-        total_energy += sum(s**2)
         # update dictionary and weights
         D[:,i] = U[:,0]
-        X[i,x_using] = s[0]*V[:,0]
+        X[i,x_using] = s[0]*V[0,:]
+        Residual_err = Y[:,x_using] - dot(D,X[:,x_using])
       except LinAlgError:
         logger.warning("svd failure updating column %d on iter %d" \
             % (i, iter_num))
-      
+
+    # compute representation error
+    err = norm(Y - dot(D,X), 'fro')
+
     logger.info('percent representation error for iteration %d was %f' % (iter_num,\
       err/total_energy))
-    logger.info('average zero-norm: %f' % (len(nonzero(X)[0]) / k))
+    logger.info('average zero-norm: %f' % (len(nonzero(X)[0]) / M))
     iter_num += 1
 
   return D,X
