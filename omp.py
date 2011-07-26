@@ -61,6 +61,8 @@ def orthogonal_matching_pursuit(D, y, stop_fun, inner_product=None):
 
     new_atom = D[:,max_atom].copy()
 
+    from math import isnan
+
     if Q is None:
       # first iteration
       Q = new_atom.reshape( (M, 1) )
@@ -80,17 +82,27 @@ def orthogonal_matching_pursuit(D, y, stop_fun, inner_product=None):
         R[j, iter_num-1] = r
         new_atom -= r * Q[:,j]
       R[iter_num-1, iter_num-1] = norm(new_atom)
+
+      # work around the case where we have perfect representation
+      new_atom_norm = 0
       if inner_product is None:
-        new_atom /= norm(new_atom)
+        new_atom_norm = norm(new_atom)
       else:
-        new_atom /= sqrt(inner_product(new_atom, new_atom))
+        new_atom_norm = sqrt( inner_product(new_atom, new_atom) )
+      if allclose(new_atom_norm, 0):
+        # roll back this iteration a bit TODO make this cleaner
+        used_atoms = used_atoms[:-1]
+        R = R[0:iter_num-1, 0:iter_num-1]
+        break
+
       Q = hstack((Q, new_atom.reshape( (M,1) )))
       z = new_atom
    
     # update residual, coeffs and iteration count
     r = inner(new_atom.squeeze(), residual.squeeze())
+
     if x is None:
-      x = r
+      x = array([r])
     else:
       x = vstack((x, r))
     residual -= (r*new_atom).reshape(residual.shape)
@@ -98,13 +110,16 @@ def orthogonal_matching_pursuit(D, y, stop_fun, inner_product=None):
 
     # compute R^{-1} x, the dictionary coefficients
     if iter_num > 2:
+      coeffs = None
       coeffs = lu_solve( (R, arange(R.shape[0]) ), x )
+      
       q = zeros( (K,1) )
       q[(used_atoms)] = coeffs
 
       err = norm(y - dot(D,q))
 
   # compute R^{-1} x, the dictionary coefficients
+  assert(iter_num > 1)
   coeffs = lu_solve( (R, arange(R.shape[0]) ), x )
   q = zeros( (K,1) )
   q[(used_atoms)] = coeffs

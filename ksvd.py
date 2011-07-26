@@ -11,7 +11,7 @@ import random
 def ksvd_stopfun(max_iter, min_err):
   return lambda n, err: n > max_iter or err < min_err
 
-def ksvd(Y, k, pursuit_fun, stop_fun):
+def ksvd(Y, k, pursuit_fun = None, stop_fun = None):
   """Compute a dictionary capable of sparsely representing the given
   data.
 
@@ -30,6 +30,14 @@ def ksvd(Y, k, pursuit_fun, stop_fun):
   outputs:
   D, X
   """
+
+  if pursuit_fun is None:
+    omp_stop = omp_stopfun(10, .01)
+    pursuit_fun = lambda D, y: omp(D, y, omp_stop)
+
+  if stop_fun is None:
+    stop_fun = ksvd_stopfun(10, .01)
+
   (N, M) = Y.shape
   logger = logging.getLogger("ksvd")
   logger.info("running ksvd on %d %d-dimensional training vectors with k=%d"\
