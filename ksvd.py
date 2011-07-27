@@ -11,6 +11,56 @@ import random
 def ksvd_stopfun(max_iter, min_err):
   return lambda n, err: n > max_iter or err < min_err
 
+def ksvd2(Y, K, T, max_residual_norm, D=None):
+
+  """Compute a dictionary of K atoms capable of sparsely representing
+  the given data, Y.  
+  
+  Computes a dictionary of K atoms capable of sparsely representing the
+  given data, Y.  Iterates until every training vector can be
+  represented having less than the given maximum residual norm.  If
+  desired, an initial dictionary can be provided; otherwise, the
+  dictionary will be initialized with random data.  This implementation
+  uses orthogonal matching pursuit to force each atom to be
+  representable with at most T atoms from the dictionary.  An inner
+  product implementation, IP, can be given as well.
+
+  Returns:
+
+  [D, X]: Dictionary D and matrix of coefficients such that ||Y-DX||_F
+  is small.
+  
+  """
+  # TODO someday, extend this to an arbitrary Hilbert space
+  from numpy import inner, nonzero, zeros, sum
+  from numpy.random import rand
+  from numpy.linalg import norm
+  from math import sqrt
+
+  (N, NumTraining) = Y.shape
+
+  if D is None or D.shape != (N, K):
+    D = rand(N,K)
+
+  # make sure the dictionary is normalized
+  for col_num in range(K):
+    D[:,col_num] = D[:,col_num] = norm(D[:,col_num])
+
+  # allocate space, algorithm stuff
+  X = zeros((K, NumTraining))
+  training_err = zeros((NumTraining,))
+  training_unfit = range(NumTraining)
+  iter_num = 1
+
+  # main loop
+  while len(training_unfit) > 0:
+    for training_id in training_unfit:
+      # do omp on this atom
+      current_l0 = len(nonzero( X[:,training_id] )[0])
+      pass
+
+    # find unfit atoms
+
 def ksvd(Y, k, pursuit_fun = None, stop_fun = None):
   """Compute a dictionary capable of sparsely representing the given
   data.
@@ -30,7 +80,6 @@ def ksvd(Y, k, pursuit_fun = None, stop_fun = None):
   outputs:
   D, X
   """
-
   if pursuit_fun is None:
     omp_stop = omp_stopfun(10, .01)
     pursuit_fun = lambda D, y: omp(D, y, omp_stop)

@@ -5,7 +5,28 @@ import logging
 def omp_stopfun(max_iter, min_err):
   return lambda n, err: n > max_iter or err < min_err
 
-def orthogonal_matching_pursuit(D, y, stop_fun, inner_product=None):
+def omp(D, y, T, err):
+  from numpy import array, int32, float32
+  from native import omp_sf
+  """Greedy algorithm for finding a sparse representation of y on the
+  overcomplete dictionary D."""
+
+  N = y.shape[0]
+  K = D.shape[1]
+
+  N = int32(N)
+  K = int32(K)
+  Df = array(D, dtype='float32', order='F')
+  yf = array(y, dtype='float32', order='F')
+  T = int32(T)
+  err = float32(err)
+  x = zeros((K,1), dtype='float32', order='F')
+
+  omp_sf(N, yf, K, Df, x, T, err)
+
+  return x
+
+def orthogonal_matching_pursuit(D, y, stop_fun=None, inner_product=None):
   """Greedy algorithm for finding a sparse representation of y on
   overcomplete and potentially redundant dictionary D.
 
@@ -22,6 +43,9 @@ def orthogonal_matching_pursuit(D, y, stop_fun, inner_product=None):
 
   """
   from scipy.linalg.decomp_lu import lu_solve
+
+  if stop_fun is None:
+    stop_fun = omp_stopfun(5, 0)
 
   (M, K) = D.shape
   x = None
