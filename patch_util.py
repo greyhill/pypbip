@@ -46,15 +46,25 @@ class patch_generator(object):
 
 def column_seq(matrix):
   """Generates a sequence from the columns of the given matrix."""
-  return ( matrix[:, i] for i in range(matrix.shape[1]) )
+  return [ matrix[:, i] for i in range(matrix.shape[1]) ]
+
+def seq2matrix(s):
+  from numpy import zeros
+  first = s[0]
+  N = len(first)
+  M = len(s)
+  to_return = zeros((N,M))
+  for (i,v) in zip(xrange(1,M), s[1:]):
+    to_return[:,i] = v.flatten()
+  return to_return
 
 def image_to_vectors(image, patch_generator):
   """Returns a sequence of vectors forming the patches of the image as
   specified by the given patch_generator."""
   image_to_vector, vector_to_image = \
       image_vector_converter_pair( patch_generator.patch_shape )
-  return ( image_to_vector(extract_patch(image, pcoords)) \
-      for pcoords in patch_generator )
+  return [ image_to_vector(extract_patch(image, pcoords)) \
+      for pcoords in patch_generator ]
 
 def disjoint_vectors_to_image(patches, patch_generator):
   """Combines a sequence of disjoint patch vectors into an image."""

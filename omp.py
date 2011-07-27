@@ -29,3 +29,19 @@ def omp(D, y, T, err):
 
   return x
 
+def omp_batch(D, Y, T, err):
+  """Perform omp on a collection of vectors arranged as columns in a
+  matrix.
+
+  Performs OMP on a collection of vectors arranged as columns in a
+  matrix.  Potentially faster than running OMP on each vector
+  individually.
+
+  """
+  (N, M) = Y.shape
+  K = D.shape[1]
+  X = zeros((K, M))
+  for i in xrange(M):
+    X[:,i] = omp(D, Y[:,i], T, err).flatten()
+  return X
+

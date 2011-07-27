@@ -106,9 +106,6 @@ bool pypbip_omp_sf(
 
   /* main loop */
   while((l0_norm < T) && (repr_err > err_thresh)) {
-    fprintf(stderr, "iteration %d, err: %f\n", 
-        l0_norm, repr_err);
-
     /* compute inner products and choose the maximum */
     float max_iprod = 0;
     float a_max_iprod = 0;
