@@ -180,13 +180,6 @@ bool pypbip_omp_sf(
 
     /* we've added one more nonzero coefficient to x... */
     ++l0_norm;
-
-    /* make sure the residual is orthogonal to the columnspan of Q */
-    for(i=0; i<l0_norm; ++i) {
-      iprod = cblas_sdot(N, residual, 1, Q_COL(i), 1);
-      fprintf(stderr, "%f\n", iprod);
-      ASSERT(fabsf(iprod) < EPS, fatal);
-    }
   }
 
   /* we've computed QRx = Dx = y, and Q'y.  all that remains is to find
