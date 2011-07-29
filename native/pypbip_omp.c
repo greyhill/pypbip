@@ -3,6 +3,8 @@
 #include <cblas.h>
 #include <clapack.h>
 
+#include <omp.h>
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -14,6 +16,114 @@
         __LINE__, __FILE__); \
     goto label; \
   }
+
+/** \brief workspace for running omp on a single vector */
+typedef struct {
+  float *Q;
+  float *R;
+  bool *used;
+  int *used_indices;
+  float *residual;
+  float *new_atom;
+  float *sparse_coeffs;
+  float *Qt_y;
+} omp_workspace;
+
+static bool omp_workspace_init(omp_workspace *w,
+    int32_t N, int32_t K, int T) {
+  bool ok = true;
+
+  float *Q = NULL;
+  float *R = NULL;
+  bool *used = NULL;
+  int *used_indices = NULL;
+  float *residual = NULL;
+  float *new_atom = NULL;
+  float *sparse_coeffs = NULL;
+  float *Qt_y = NULL;
+
+  /* TODO it would be nice to reduce all these callocs to one... */
+
+  /* allocate space for Q, R, etc. */
+  Q = calloc(sizeof(float), N * T);
+  ASSERT(Q != NULL, fatal);
+
+/* TODO i could use less memory in representing R if I was clever about
+ * it... */
+  R = calloc(sizeof(float), T * T);
+  ASSERT(R != NULL, fatal);
+
+  used = calloc(sizeof(bool), K);
+  ASSERT(used != NULL, fatal);
+
+  used_indices = calloc(sizeof(int), T);
+  ASSERT(used_indices != NULL, fatal);
+
+  residual = calloc(sizeof(float), N);
+  ASSERT(residual != NULL, fatal);
+
+  new_atom = calloc(sizeof(float), N);
+  ASSERT(new_atom != NULL, fatal);
+
+  sparse_coeffs = calloc(sizeof(float), T);
+  ASSERT(sparse_coeffs != NULL, fatal);
+
+  Qt_y = calloc(sizeof(float), T);
+  ASSERT(Qt_y != NULL, fatal);
+
+  /* copy stuff over, and mark each copy as successful (setting local
+   * pointer to NULL) */
+  w->Q = Q; Q = NULL;
+  w->R = R; R = NULL;
+  w->used = used; used = NULL;
+  w->used_indices = used_indices; used_indices = NULL;
+  w->residual = residual; residual = NULL;
+  w->new_atom = new_atom; new_atom = NULL;
+  w->sparse_coeffs = sparse_coeffs; sparse_coeffs = NULL;
+  w->Qt_y = Qt_y; Qt_y = NULL;
+
+  if(0) {
+fatal:
+    ok = false;
+
+    /* erase memory allocated before failure */
+    if(Q) free(Q);
+    if(R) free(R);
+    if(used) free(used);
+    if(used_indices) free(used_indices);
+    if(residual) free(residual);
+    if(new_atom) free(new_atom);
+    if(sparse_coeffs) free(sparse_coeffs);
+    if(Qt_y) free(Qt_y);
+  }
+
+  return ok;
+}
+
+static bool omp_workspace_clear(omp_workspace *w,
+    int32_t N, int32_t K, int T) {
+  bzero(w->Q, sizeof(float) * N * T);
+  bzero(w->R, sizeof(float) * T * T);
+  bzero(w->used, sizeof(bool) * K);
+  bzero(w->used_indices, sizeof(int) * T);
+  bzero(w->residual, sizeof(float) * N);
+  bzero(w->new_atom, sizeof(float) * N);
+  bzero(w->sparse_coeffs, sizeof(float) * T);
+  bzero(w->Qt_y, sizeof(float) * T);
+  return true;
+}
+
+static bool omp_workspace_del(omp_workspace *w) {
+  free(w->Q); w->Q = NULL;
+  free(w->R); w->R = NULL;
+  free(w->used); w->used = NULL;
+  free(w->used_indices); w->used_indices = NULL;
+  free(w->residual); w->residual = NULL;
+  free(w->new_atom); w->new_atom = NULL;
+  free(w->sparse_coeffs); w->sparse_coeffs = NULL;
+  free(w->Qt_y); w->Qt_y = NULL;
+  return true;
+}
 
 /** \brief perform back substitution.
   Solves the problem R{out} = b subject to:
@@ -45,60 +155,31 @@ static bool backsub(int T, const float *R, const float *b, int N, float *out) {
 /* totally arbitrary floating-point epsilon */
 #define EPS .0001
 
-bool pypbip_omp_sf(
+static bool pypbip_omp_sf_do(
     int32_t N,
     const float *y,
     int32_t K,
     const float *D,
     float *x,
     int T,
-    float err_thresh) {
+    float err_thresh,
+    const omp_workspace *w) {
   bool ok = true;
 
-  float *Q = NULL;
-  float *R = NULL;
-  bool *used = NULL;
-  int *used_indices = NULL;
-  float *residual = NULL;
-  float *new_atom = NULL;
-  float *sparse_coeffs = NULL;
-  float *Qt_y = NULL;
+  float *Q = w->Q;
+  float *R = w->R;
+  bool *used = w->used;
+  int *used_indices = w->used_indices;
+  float *residual = w->residual;
+  float *new_atom = w->new_atom;
+  float *sparse_coeffs = w->sparse_coeffs;
+  float *Qt_y = w->Qt_y;
   int8_t l0_norm = 0;
   float repr_err = cblas_sdot(N, y, 1, y, 1);
 
   float iprod;
 
   int i;
-
-  /* TODO it would be nice to reduce all these callocs to one... */
-
-  /* allocate space for Q, R, etc. */
-  Q = calloc(sizeof(float), N * T);
-  ASSERT(Q != NULL, fatal);
-
-/* TODO i could use less memory in representing R if I was clever about
- * it... */
-  R = calloc(sizeof(float), T * T);
-  ASSERT(R != NULL, fatal);
-
-  used = calloc(sizeof(bool), K);
-  ASSERT(used != NULL, fatal);
-
-  used_indices = calloc(sizeof(int), T);
-  ASSERT(used_indices != NULL, fatal);
-
-  residual = calloc(sizeof(float), N);
-  ASSERT(residual != NULL, fatal);
-  memcpy(residual, y, N*sizeof(float));
-
-  new_atom = calloc(sizeof(float), N);
-  ASSERT(new_atom != NULL, fatal);
-
-  sparse_coeffs = calloc(sizeof(float), T);
-  ASSERT(sparse_coeffs != NULL, fatal);
-
-  Qt_y = calloc(sizeof(float), T);
-  ASSERT(Qt_y != NULL, fatal);
 
 #define D_COL(i) (D+N*(i))
 #define Q_COL(i) (Q+N*(i))
@@ -197,15 +278,77 @@ fatal:
   }
 
 cleanup:
-  if(Q) free(Q);
-  if(R) free(R);
-  if(used) free(used);
-  if(used_indices) free(used_indices);
-  if(residual) free(residual);
-  if(new_atom) free(new_atom);
-  if(sparse_coeffs) free(sparse_coeffs);
-  if(Qt_y) free(Qt_y);
+  return ok;
+}
 
+bool pypbip_omp_sf(
+    int32_t N,
+    const float *y,
+    int32_t K,
+    const float *D,
+    float *x,
+    int T,
+    float err_thresh) {
+  bool ok = true;
+  omp_workspace w;
+
+  ASSERT(omp_workspace_init(&w, N, K, T), fatal);
+  ASSERT(pypbip_omp_sf_do(N, y, K, D, x, T, err_thresh, &w), fatal);
+
+  if(0) {
+fatal:
+    ok = false;
+  }
+
+  omp_workspace_del(&w);
+  return ok;
+}
+
+bool pypbip_omp_batch_sf(
+    int32_t N,
+    int32_t M,
+    float *y,
+    int32_t K,
+    float *D,
+    float *X,
+    int T,
+    float err) {
+  /* FIXME currently, while the batch run is awesome and multithreaded,
+   * it doesn't report errors correctly. */
+  omp_workspace w;
+  bool ok = true;
+  bool *runs_ok = NULL;
+  int i;
+
+  /* allocate space for error checks */
+  runs_ok = malloc(sizeof(bool) * M);
+  ASSERT(runs_ok != NULL, fatal);
+  for(i=0; i<M; ++i) runs_ok[i] = true;
+
+#pragma omp parallel shared(y,D,X,runs_ok) private(w)
+  {
+    /* per-thread workspace */
+    omp_workspace_init(&w, N, K, T);
+
+    /* split across threads */
+#pragma omp for schedule(static) nowait
+    for(i=0; i<M; ++i) {
+      omp_workspace_clear(&w, N, K, T);
+      runs_ok[i] = pypbip_omp_sf_do(N, y, K, D, X+K*i, T, err, &w);
+    }
+
+    omp_workspace_del(&w);
+  } /* end of parallel section */
+
+  /* find if any threads failed */
+  for(i=0; i<M; ++i) ok &= runs_ok[i];
+
+  if(0) {
+fatal:
+    ok = false;
+  }
+
+  if(runs_ok) free(runs_ok);
   return ok;
 }
 

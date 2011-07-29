@@ -41,17 +41,58 @@ PyObject* py_pypbip_omp_sf(PyObject *self, PyObject *args) {
   D = PyArray_DATA(D_);
   x = PyArray_DATA(x_);
 
-#if 0
   Py_BEGIN_ALLOW_THREADS
-#endif
 
   alg_ok = pypbip_omp_sf(
       N, y, K, D,
       x, T, err);
 
-#if 0
   Py_END_ALLOW_THREADS
-#endif
+
+  if(!alg_ok) {
+    PyErr_BadInternalCall();
+  }
+
+  Py_INCREF(Py_None);
+  return Py_None;
+}
+
+/* pypbip_omp_batch_sf */
+PyDoc_STRVAR(
+    py_pypbip_omp_batch_sf__doc__,
+    "performs batched omp using a given dictionary\n\n");
+PyObject* py_pypbip_omp_batch_sf(PyObject *self, PyObject *args) {
+  int py_ok = true;
+  bool alg_ok = true;
+
+  PyArrayObject *y_ = NULL, 
+                *D_ = NULL, 
+                *x_ = NULL;
+  float *y = NULL, 
+        *D = NULL, 
+        *x = NULL;
+  int N, M, K, T;
+  float err;
+
+  /* parse arguments from python */
+  py_ok = PyArg_ParseTuple(args, "iiOiOOif", 
+      &N, &M, &y_, &K, &D_, &x_, &T, &err);
+  if(!py_ok) {
+    fprintf(stderr, "hm, problem.\n");
+    PyErr_BadInternalCall();
+  }
+
+  y = PyArray_DATA(y_);
+  D = PyArray_DATA(D_);
+  x = PyArray_DATA(x_);
+
+  Py_BEGIN_ALLOW_THREADS
+
+  alg_ok = pypbip_omp_batch_sf(
+      N, M, y, K, D,
+      x, T, err);
+
+  Py_END_ALLOW_THREADS
 
   if(!alg_ok) {
     PyErr_BadInternalCall();
@@ -64,6 +105,8 @@ PyObject* py_pypbip_omp_sf(PyObject *self, PyObject *args) {
 static PyMethodDef pypbip_native_methods[] = {
   {"omp_sf", py_pypbip_omp_sf, METH_VARARGS,
     py_pypbip_omp_sf__doc__},
+  {"omp_batch_sf", pypbip_omp_batch_sf, METH_VARARGS,
+    py_pypbip_omp_batch_sf__doc__},
   {NULL, NULL}
 };
 

@@ -9,7 +9,6 @@ import random
 
 def ksvd(Y, K, T, D=None, max_err=0, max_iter=10):
   logger = logging.getLogger(__name__)
-  print "btdubs, the ksvd logger is %s" % __name__
 
   (N, M) = Y.shape
 

@@ -1,4 +1,5 @@
 # utilities for patch-related image processing
+# TODO extend this patch business to an N-dimensional signal
 
 def image_vector_converter_pair(image_size):
   num_elems = reduce( lambda x,y: x*y, image_size )
@@ -45,8 +46,12 @@ class patch_generator(object):
             (x+self.radius+1,y+self.radius+1))
 
 def column_seq(matrix):
-  """Generates a sequence from the columns of the given matrix."""
+  """Returns a sequence from the columns of the given matrix."""
   return [ matrix[:, i] for i in range(matrix.shape[1]) ]
+
+def column_gen(matrix):
+  """Generates a sequence from the columns of the given matrix."""
+  return ( matrix[:, i] for i in xrange(matrix.shape[1]) )
 
 def seq2matrix(s):
   from numpy import zeros

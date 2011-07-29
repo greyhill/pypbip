@@ -38,10 +38,23 @@ def omp_batch(D, Y, T, err):
   individually.
 
   """
-  (N, M) = Y.shape
+  from numpy import array, int32, float32
+  from native import omp_sf
+
+  N = y.shape[0]
+  M = y.shape[1]
   K = D.shape[1]
-  X = zeros((K, M))
-  for i in xrange(M):
-    X[:,i] = omp(D, Y[:,i], T, err).flatten()
-  return X
+
+  N = int32(N)
+  M = int32(M)
+  K = int32(K)
+  Df = array(D, dtype='float32', order='F')
+  yf = array(y, dtype='float32', order='F')
+  T = int32(T)
+  err = float32(err)
+  x = zeros((K,1), dtype='float32', order='F')
+
+  omp_sf(N, M, yf, K, Df, x, T, err)
+
+  return x
 

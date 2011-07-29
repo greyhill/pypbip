@@ -30,14 +30,14 @@ bool pypbip_omp_sf(
  *
  * Assumes data is in Fortran order, i.e., column-major.  THIS IS NOT
  * THE "STANDARD" C REPRESENTATION */
-bool pypbip_omp_batch(
+bool pypbip_omp_batch_sf(
     int32_t N,
-    int32_t num_vec,
+    int32_t M,
     float *y,
     int32_t K,
     float *D,
     float *X,
-    int8_t T,
+    int T,
     float err);
 
 #endif

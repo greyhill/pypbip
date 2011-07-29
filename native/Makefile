@@ -3,7 +3,7 @@ PYSHARED=/usr/include/pyshared
 LAPACK=/usr/include/atlas
 
 CC=gcc
-CFLAGS=-g3 -Wall -Wextra -I${PYTHON} -fPIC -I${LAPACK}
+CFLAGS=-g3 -Wall -Wextra -I${PYTHON} -fPIC -I${LAPACK} -fopenmp
 
 OFILES=pypbip_omp.o \
 			 pypbip_native.o
