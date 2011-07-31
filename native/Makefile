@@ -6,7 +6,8 @@ CC=gcc
 CFLAGS=-g3 -Wall -Wextra -I${PYTHON} -fPIC -I${LAPACK} -fopenmp
 
 OFILES=pypbip_omp.o \
-			 pypbip_native.o
+			 pypbip_native.o \
+			 pypbip_ksvd.o 
 OUT=pypbip_native.so
 
 ${OUT}: ${OFILES}

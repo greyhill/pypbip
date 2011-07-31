@@ -102,14 +102,15 @@ fatal:
 
 static bool omp_workspace_clear(omp_workspace *w,
     int32_t N, int32_t K, int T) {
-  bzero(w->Q, sizeof(float) * N * T);
-  bzero(w->R, sizeof(float) * T * T);
-  bzero(w->used, sizeof(bool) * K);
-  bzero(w->used_indices, sizeof(int) * T);
-  bzero(w->residual, sizeof(float) * N);
-  bzero(w->new_atom, sizeof(float) * N);
-  bzero(w->sparse_coeffs, sizeof(float) * T);
-  bzero(w->Qt_y, sizeof(float) * T);
+  int i;
+  memset(w->Q, 0, sizeof(float) * N * T);
+  memset(w->R, 0, sizeof(float) * T * T);
+  for(i=0; i<K; ++i) w->used[i] = false;
+  memset(w->used_indices, 0, sizeof(int) * T);
+  memset(w->residual, 0, sizeof(float) * N);
+  memset(w->new_atom, 0, sizeof(float) * N);
+  memset(w->sparse_coeffs, 0, sizeof(float) * T);
+  memset(w->Qt_y, 0, sizeof(float) * T);
   return true;
 }
 
@@ -153,7 +154,7 @@ static bool backsub(int T, const float *R, const float *b, int N, float *out) {
 }
 
 /* totally arbitrary floating-point epsilon */
-#define EPS .0001
+#define EPS .000000001
 
 static bool pypbip_omp_sf_do(
     int32_t N,
@@ -174,12 +175,14 @@ static bool pypbip_omp_sf_do(
   float *new_atom = w->new_atom;
   float *sparse_coeffs = w->sparse_coeffs;
   float *Qt_y = w->Qt_y;
+
   int8_t l0_norm = 0;
   float repr_err = cblas_sdot(N, y, 1, y, 1);
-
+  
   float iprod;
-
   int i;
+
+  memcpy(residual, y, sizeof(float)*N);
 
 #define D_COL(i) (D+N*(i))
 #define Q_COL(i) (Q+N*(i))
@@ -202,7 +205,7 @@ static bool pypbip_omp_sf_do(
         max_iprod = iprod;
       }
     }
-    ASSERT(max_iprod_index != -1, fatal);
+    if(max_iprod_index == -1) break;
 
     /* make a copy of the new atom; we'll be doing a lot of operations
      * on it */
@@ -334,7 +337,7 @@ bool pypbip_omp_batch_sf(
 #pragma omp for schedule(static) nowait
     for(i=0; i<M; ++i) {
       omp_workspace_clear(&w, N, K, T);
-      runs_ok[i] = pypbip_omp_sf_do(N, y, K, D, X+K*i, T, err, &w);
+      runs_ok[i] = pypbip_omp_sf_do(N, y+N*i, K, D, X+K*i, T, err, &w);
     }
 
     omp_workspace_del(&w);

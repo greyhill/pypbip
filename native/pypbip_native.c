@@ -105,7 +105,7 @@ PyObject* py_pypbip_omp_batch_sf(PyObject *self, PyObject *args) {
 static PyMethodDef pypbip_native_methods[] = {
   {"omp_sf", py_pypbip_omp_sf, METH_VARARGS,
     py_pypbip_omp_sf__doc__},
-  {"omp_batch_sf", pypbip_omp_batch_sf, METH_VARARGS,
+  {"omp_batch_sf", py_pypbip_omp_batch_sf, METH_VARARGS,
     py_pypbip_omp_batch_sf__doc__},
   {NULL, NULL}
 };
