@@ -122,5 +122,14 @@ def ksvd(Y, K, T, D=None, max_err=0, max_iter=10, approx=False,
         "maximum representation error for ksvd iteration %d was %f" \
         % (iter_num, err) )
 
+  # TODO remove this
+  from numpy import isnan
+  assert(alltrue(-isnan(Y)))
+  assert(alltrue(-isnan(D)))
+  assert(alltrue(-isnan(X)))
+  assert(alltrue(isfinite(Y)))
+  assert(alltrue(isfinite(D)))
+  assert(alltrue(isfinite(X)))
+
   return D,X
 
