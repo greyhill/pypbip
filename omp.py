@@ -17,6 +17,15 @@ __omp_sf.argtypes = [ ct.c_int32,
 
 __omp_batch_sf = __lib.pypbip_omp_batch_sf
 __omp_batch_sf.restype = ct.c_bool
+__omp_batch_sf.argtypes = [ \
+    ct.c_int,
+    ct.c_int,
+    np.ctypeslib.ndpointer(dtype = ct.c_float),
+    ct.c_int,
+    np.ctypeslib.ndpointer(dtype = ct.c_float),
+    np.ctypeslib.ndpointer(dtype = ct.c_float),
+    ct.c_int,
+    ct.c_float ]
 
 def omp(D, Y, T, max_err):
   """Greedy algorithm for finding a sparse representation of y on the
@@ -54,7 +63,7 @@ def omp(D, Y, T, max_err):
   else:
     # Y is a matrix; use batch
     M = ct.c_int32(Y.shape[1])
-    X = np.empty(shape=(D.shape[1], Y.shape[1]), dtype=float, order='F')
+    X = np.empty(shape=(D.shape[1], Y.shape[1]), dtype=np.float32, order='F')
     if not __omp_batch_sf(N, M, Y, K, D, X, T, max_err):
       raise Exception(\
           "something happened whilst executing pypbip_omp_batch_sf")
