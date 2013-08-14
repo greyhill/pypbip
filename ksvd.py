@@ -1,7 +1,6 @@
 #!/usr/bin/python
 #
 
-from patch_util import *
 from pylab import *
 from omp import omp
 import logging 
